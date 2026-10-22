@@ -1,0 +1,189 @@
+// Prisma schema for Laxmi Travels - Car Travel Agency
+// Supports SQLite for instant out-of-the-box local operation,
+// and easily configurable to PostgreSQL via DATABASE_URL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  phone        String
+  passwordHash String
+  role         String    @default("CUSTOMER") // "CUSTOMER" or "ADMIN"
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  bookings     Booking[]
+}
+
+model Vehicle {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String    // e.g. "Maruti Suzuki Dzire", "Toyota Innova Crysta"
+  category        String    // "HATCHBACK", "SEDAN", "PREMIUM_SEDAN", "SUV", "PREMIUM_SUV", "LUXURY", "TEMPO_TRAVELLER"
+  seatingCapacity Int
+  luggageCapacity Int
+  hasAc           Boolean   @default(true)
+  fuelType        String    @default("Diesel / Petrol / CNG")
+  transmission    String    @default("Manual / Automatic")
+  ratePerKm       Float
+  baseFare        Float     // Minimum booking base fare
+  perHourRate     Float?    // For local hourly rentals
+  minHours        Int?      // Minimum hourly duration (e.g. 4 or 8 hrs)
+  image           String
+  description     String
+  features        String    // JSON encoded array of amenities: ["Pushback Seats", "Rear AC Vents", "Phone Charging", "Audio System", "GPS Tracking"]
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  bookings        Booking[]
+}
+
+model Route {
+  id            String   @id @default(cuid())
+  source        String   @default("Vapi")
+  destination   String   // e.g. "Surat", "Mumbai", "Ahmedabad", "Daman", "Saputara"
+  distanceKm    Int
+  durationHours String   // e.g. "2.5 hrs", "3.5 hrs"
+  sedanFare     Float
+  suvFare       Float
+  tollEstimate  Float
+  popular       Boolean  @default(true)
+  imageUrl      String?
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Booking {
+  id                  String    @id @default(cuid())
+  bookingRef          String    @unique // e.g. "LT-2026-9281"
+  tripType            String    // "ONE_WAY", "ROUND_TRIP", "AIRPORT_TRANSFER", "LOCAL_HOURLY", "OUTSTATION", "FULL_DAY", "CUSTOM_ROAD_TRIP"
+  
+  // Customer Details
+  customerName        String
+  customerPhone       String
+  customerEmail       String?
+  specialInstructions String?
+  
+  // Trip Details
+  pickupLocation      String
+  dropLocation        String
+  pickupDate          String    // YYYY-MM-DD
+  pickupTime          String    // HH:MM
+  returnDate          String?   // YYYY-MM-DD (for round trips)
+  returnTime          String?   // HH:MM
+  passengerCount      Int       @default(1)
+  luggageCount        Int       @default(1)
+  
+  // Service specific
+  airportName         String?   // "Mumbai (BOM)", "Surat (STV)", "Ahmedabad (AMD)"
+  airportDirection    String?   // "TO_AIRPORT" or "FROM_AIRPORT"
+  flightNumber        String?
+  hourlyPackage       String?   // "4hrs_40km", "8hrs_80km", "12hrs_120km", "FULL_DAY"
+  
+  // Vehicle Details
+  vehicleId           String?
+  vehicle             Vehicle?  @relation(fields: [vehicleId], references: [id])
+  vehicleName         String?
+  vehicleCategory     String?
+  
+  // Fare & Financials
+  estimatedKm         Float?
+  baseFare            Float     @default(0)
+  tollTaxes           Float     @default(0)
+  driverAllowance     Float     @default(0)
+  discountAmount      Float     @default(0)
+  totalFare           Float     @default(0)
+  quotationNote       String?
+  
+  // Statuses
+  // "BOOKING_REQUESTED", "QUOTE_PENDING", "QUOTE_SENT", "AWAITING_PAYMENT", "CONFIRMED", "TRIP_COMPLETED", "CANCELLATION_REQUESTED", "CANCELLED", "REFUND_PENDING", "REFUNDED"
+  status              String    @default("BOOKING_REQUESTED")
+  
+  // Payment
+  // "PENDING", "PAID", "REFUNDED", "FAILED"
+  paymentStatus       String    @default("PENDING")
+  paymentMethod       String?   // "ONLINE_RAZORPAY", "CASH_TO_DRIVER", "BANK_TRANSFER"
+  razorpayOrderId     String?
+  razorpayPaymentId   String?
+  razorpaySignature   String?
+  paidAmount          Float?    @default(0)
+  paymentDate         DateTime?
+  
+  // Driver / Car Assignment by Admin
+  driverName          String?
+  driverPhone         String?
+  vehiclePlateNo      String?
+  assignedAt          DateTime?
+  
+  // Administrative notes
+  adminNotes          String?
+  
+  // Linked user (optional)
+  userId              String?
+  user                User?     @relation(fields: [userId], references: [id])
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Review {
+  id              String   @id @default(cuid())
+  authorName      String
+  authorLocation  String   @default("Vapi")
+  rating          Int      @default(5)
+  comment         String
+  tripRoute       String?  // e.g. "Vapi to Mumbai", "Vapi to Ajmer"
+  avatarUrl       String?
+  verifiedBooking Boolean  @default(true)
+  isApproved      Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
+
+model Enquiry {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  subject   String?
+  message   String
+  status    String   @default("UNREAD") // "UNREAD", "READ", "RESPONDED"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Offer {
+  id              String   @id @default(cuid())
+  code            String   @unique // e.g. "LAXMI10", "AIRPORT150"
+  title           String
+  description     String
+  discountPercent Int?     // e.g. 10%
+  discountAmount  Float?   // e.g. 150 INR
+  minTripFare     Float?   @default(1000)
+  validUntil      String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
+
+model Setting {
+  id              String   @id @default("singleton")
+  businessName    String   @default("Laxmi Travels")
+  phone           String   @default("+91 7255055889")
+  whatsapp        String   @default("7255055889")
+  email           String   @default("laxmitravelsvapi@gmail.com")
+  address         String   @default("PL. NO. C/6-2/13, SHOP G/04, N.H. 8, Vapi, Taluka - Pardi, Vapi, Gujarat 396191")
+  tagline         String   @default("Every Journey Begins With Trust.")
+  razorpayKeyId   String?  @default("rzp_test_laxmi_travels_mock")
+  razorpaySecret  String?  @default("mock_secret_key")
+  enableOnlinePay Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+}
